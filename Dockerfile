@@ -1,4 +1,4 @@
-FROM scratch
+FROM scratch as base_package
 
 # copy the latest image into the container
 COPY home/engine/engines/unicycle/engine /engine
