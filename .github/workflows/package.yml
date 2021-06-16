@@ -6,7 +6,8 @@ on:
       - main
     tags:
       - "[0-9]+.[0-9]+.[0-9]+"
-  workflow_dispatch:
+  schedule:
+    - cron: 0 8 * * *
 
 jobs:
   build:
@@ -30,9 +31,65 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq dos2unix
 
-      - name: Run Build
+      - name: Run Tests
+        env:
+          TEST_OUTPUT_DIR: ${{ github.workspace }}/hamlet_tests
         run: |
-          ./build.sh
+          ./test.sh
+
+      - name: Shared Plugin Results
+        uses: mikepenz/action-junit-report@v2
+        with:
+          report_paths: 'hamlet_tests/shared/junit.xml'
+          fail_on_failure: true
+          require_tests: true
+          check_name: Shared Plugin Results
+
+      - name: AWS Plugin Results
+        uses: mikepenz/action-junit-report@v2
+        with:
+          report_paths: 'hamlet_tests/aws/junit.xml'
+          fail_on_failure: true
+          require_tests: true
+          check_name: AWS Plugin Results
+
+      - name: Azure Plugin Results
+        uses: mikepenz/action-junit-report@v2
+        with:
+          report_paths: 'hamlet_tests/azure/junit.xml'
+          fail_on_failure: true
+          require_tests: true
+          check_name: Azure Plugin Results
+
+      - id: get_tag_name
+        name: image tag prefix
+        run: |
+          if [[ "${{ github.event_name}}" == "schedule" ]]; then
+            echo ::set-output name=TAG_NAME::nightly
+            echo ::set-output name=PUSH_IMAGE::true
+            exit 0
+          fi
+
+          if [[ "${{ github.event_name}}" == "workflow_dispatch" ]]; then
+            echo ::set-output name=TAG_NAME::latest
+            echo ::set-output name=PUSH_IMAGE::true
+            exit 0
+          fi
+
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo ::set-output name=TAG_NAME::latest
+            echo ::set-output name=PUSH_IMAGE::true
+            exit 0
+          fi
+
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo ::set-output name=TAG_NAME::${GITHUB_REF#refs/tags/}
+            echo ::set-output name=PUSH_IMAGE::true
+            exit 0
+          fi
+
+          echo ::set-output name=TAG_NAME::test
+          echo ::set-output name=PUSH_IMAGE::false
 
       - name: Set up Docker
         uses: docker/setup-buildx-action@v1
@@ -44,23 +101,9 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push latest
-        if: github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v2
-        with:
-          tags: "ghcr.io/${{ github.repository}}:latest"
-          push: true
-          target: base_package
-
-      - name: Get the tag name
-        if: startsWith(github.ref, 'refs/tags/')
-        id: get_tag_name
-        run: echo ::set-output name=TAG_NAME::${GITHUB_REF#refs/tags/}
-
       - name: Push Release
-        if: startsWith(github.ref, 'refs/tags/' )
         uses: docker/build-push-action@v2
         with:
+          push: ${{ startsWith(steps.get_tag_name.outputs.PUSH_IMAGE, 'true') }}
           tags: "ghcr.io/${{github.repository}}:${{ steps.get_tag_name.outputs.TAG_NAME }}"
-          push: true
           target: base_package

@@ -16,7 +16,6 @@ mkdir -p "${HAMLET_HOME_DIR}"
 
 hamlet engine install-engine "${engine}"
 
-
 echo "[%] Environment setup"
 
 eval "$(hamlet --engine "${engine}" engine env)"
