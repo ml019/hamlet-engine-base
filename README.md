@@ -38,3 +38,42 @@ The hamlet-engine-base produces a collection of images based on different requir
   - A collection of entrances are invoked across the test providers to ensure they work as expected and might not be caught by testing
   - Generate a full cmdb set and use the whatif provider to generate default templates included in the engine
 - A new docker image is then created using the images
+
+## Release Process
+
+An automated build of the engine is generated each night and published to the container registry. The builds are tagged based on the date the image was created.
+Each of these releases are considered as releases candidates for the next release.
+
+The current release is defined in the `state/release_engine_state.json` file which specifies the details of the specific engine version to release
+
+### Creating a release
+
+1. Determine the current tram release that will be the candidate. You can see all of the available releases with `hamlet engine list-engines --include-hidden`
+2. Select the release from the root of this repo run `hamlet engine describe-engine -n < the name of the selected release> > state/release_engine_state.json`
+3. Commit the latest engine selection to the repo
+4. Run bump2version to set the latest version and tag the repo
+
+    ```bash
+    # install requirements
+    pip install -r requirements.txt
+    ```
+
+    ```bash
+    # major
+    bump2version major
+
+    # minor
+    bump2version minor
+
+    # patch
+    bump2version patch
+    ```
+
+5. Push the commit for the engine state and the tags
+
+    ```bash
+    git push
+    git push --tags
+    ```
+
+6. The github workflow will then create the container image, and push to both the `latest` tag and to the version tag

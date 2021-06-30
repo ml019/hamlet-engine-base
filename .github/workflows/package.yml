@@ -7,9 +7,6 @@ on:
 
 jobs:
   build:
-    env:
-      ENGINE: 'unicycle'
-
     runs-on: ubuntu-latest
     steps:
 
@@ -30,29 +27,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq dos2unix
 
+      - id: pick_engine
+        name: Pick Engine
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo ::set-output name=engine::"$(cat state/release_engine_state.json | jq -r '.engine.name')"
+          else
+            echo ::set-output name=engine::unicycle
+          fi
+
       - name: Run Tests
         env:
           TEST_OUTPUT_DIR: ${{ github.workspace }}/hamlet_tests
         run: |
-          ./test.sh "${ENGINE}"
-
-      - name: setup github
-        run: |
-         git config --global user.name "Github"
-         git config --global user.email "noreply@github.com"
-
-      - name: add build data
-        working-directory: state
-        run: |
-          hamlet engine describe-engine -n "${ENGINE}" > engine.json
-          git add ./
-          git commit -m 'chore: add latest build details'
-
-      - name: bump rc version
-        if: github.ref == 'refs/heads/main'
-        run: |
-          pip install -r requirements.txt
-          bump2version build
+          ./test.sh "${{steps.pick_engine.outputs.engine}}"
 
       - name: Shared Plugin Results
         uses: mikepenz/action-junit-report@v2
@@ -86,7 +74,10 @@ jobs:
           flavor: |
             latest=auto
           tags: |
+            type=edge,branch=main
             type=semver,pattern={{version}}
+            type=schedule,pattern=nightly
+            type=schedule,pattern={{date 'YYYYMMDD'}}
 
       - name: Set up Docker
         uses: docker/setup-buildx-action@v1
@@ -105,25 +96,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           target: base_package
-
-      - name: Bump to next dev release
-        if: startsWith(github.ref, 'refs/tags/' )
-        working-directory: ./hamlet-cli
-        run: |
-          bump2version minor
-
-      - name: Push Tags
-        run: |
-          git push --tags
-
-      - name: Create Pull Request
-        id: release_pr
-        uses: peter-evans/create-pull-request@v3
-        with:
-          commit-message: "chore: version bump"
-          delete-branch: true
-          title: 'chore: update release details'
-          body: 'latest build of the tram completed. Merge this PR to acknowledge release'
-          labels: 'chore'
-          base: 'main'
-          branch: create-pull-request/release_bump
+          build-args: |
+            engine=${{steps.pick_engine.outputs.engine}}
