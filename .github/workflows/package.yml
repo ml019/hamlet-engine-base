@@ -77,7 +77,7 @@ jobs:
             type=edge,branch=main
             type=semver,pattern={{version}}
             type=schedule,pattern=nightly
-            type=schedule,pattern={{date 'YYYYMMDD'}}
+            type=schedule,pattern=tram_{{date 'YYYYMMDD'}}
 
       - name: Set up Docker
         uses: docker/setup-buildx-action@v1
