@@ -8,7 +8,7 @@ USER root
 RUN apt-get update && apt-get install -y \
         jq dos2unix
 
-RUN pip3 install --pre hamlet-cli
+RUN pip3 install hamlet-cli
 
 WORKDIR /build/
 
